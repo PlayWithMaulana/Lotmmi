@@ -63,6 +63,16 @@ public class CreepingHungerItem extends Item {
         super(properties);
     }
 
+    /**
+     * Give Creeping Hunger a permanent enchantment-glint shimmer so it reads
+     * as a living, soul-hungry artifact rather than a plain item - both in the
+     * inventory and held in-hand.
+     */
+    @Override
+    public boolean isFoil(ItemStack stack) {
+        return true;
+    }
+
     // ---------------------------------------------------------------
     // Soul bookkeeping model (our own component, separate from the
     // shared ability pool that lives in SEALED_ARTIFACT_DATA)
