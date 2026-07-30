@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.yourname.lotmmi.LotmMysticalItems;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -30,12 +31,14 @@ public class ModDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> SOULS =
             DATA_COMPONENT_TYPES.register("souls", () -> DataComponentType.<String>builder()
                     .persistent(Codec.STRING)
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8)
                     .build());
 
     // Game-time tick this item was last fed - used for the hunger downside.
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> LAST_FED_TICK =
             DATA_COMPONENT_TYPES.register("last_fed_tick", () -> DataComponentType.<Long>builder()
                     .persistent(Codec.LONG)
+                    .networkSynchronized(ByteBufCodecs.VAR_LONG)
                     .build());
 
     public static void register(IEventBus eventBus) {
