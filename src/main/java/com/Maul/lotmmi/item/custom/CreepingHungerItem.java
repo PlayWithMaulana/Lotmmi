@@ -5,6 +5,7 @@ import de.jakob.lotm.LOTMCraft;
 import de.jakob.lotm.attachments.DoorAuthorityData;
 import de.jakob.lotm.beyonders.abilities.core.Ability;
 import de.jakob.lotm.beyonders.artifacts.SealedArtifactData;
+import de.jakob.lotm.beyonders.artifacts.NegativeEffect;
 import de.jakob.lotm.beyonders.potions.BeyonderCharacteristicItem;
 import de.jakob.lotm.beyonders.potions.BeyonderCharacteristicItemHandler;
 import de.jakob.lotm.gamerule.ModGameRules;
@@ -26,7 +27,6 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -61,6 +61,27 @@ public class CreepingHungerItem extends Item {
 
     public CreepingHungerItem(Properties properties) {
         super(properties);
+    }
+
+    /**
+     * A single TOKEN negative effect used only so SEALED_ARTIFACT_DATA.negativeEffect()
+     * is NOT empty. The base mod's BeyonderEventHandler.onContainerOpen() DELETES any
+     * stack carrying SEALED_ARTIFACT_DATA whose negative-effect list is empty (unless the
+     * allowArtifactsWithNoNegatives gamerule is on) - that was wiping this glove every
+     * time any container (chest/barrel/ender chest/backpack) was opened after grazing.
+     *
+     * Giving the data a non-empty list makes it no longer qualify for that deletion.
+     * Crucially this token effect NEVER actually harms the wielder: the base mod's
+     * SealedArtifactEffectHandler only ticks negative effects on stacks that are
+     * `instanceof SealedArtifactItem`, and this glove is our own class, so no effect
+     * in this list is ever applied. We use our own hunger mechanic for the downside.
+     */
+    private static List<NegativeEffect> tokenNegatives() {
+        List<NegativeEffect> list = new ArrayList<>();
+        // CURSED is a use-only-tick effect in the base mod, so even on a real artifact it
+        // would only ever matter on ability use, not passively. On our glove it is inert.
+        list.add(new NegativeEffect(NegativeEffect.NegativeEffectType.CURSED, 0, null, 0));
+        return list;
     }
 
     // ---------------------------------------------------------------
@@ -106,6 +127,103 @@ public class CreepingHungerItem extends Item {
         stack.set(ModDataComponents.SOULS.get(), sb.toString());
     }
 
+    // ---------------------------------------------------------------
+    // The reserve / "food" soul (the 6th soul). It never joins the ability
+    // pool and can never be cast with - it exists only to be devoured by the
+    // hunger downside so the wielder isn't the one that gets gnawed on.
+    // ---------------------------------------------------------------
+
+    public static SoulSlot getFoodSoul(ItemStack stack) {
+        String raw = stack.getOrDefault(ModDataComponents.FOOD_SOUL.get(), "");
+        if (raw.isEmpty()) return null;
+        return SoulSlot.deserialize(raw);
+    }
+
+    public static void setFoodSoul(ItemStack stack, SoulSlot soul) {
+        stack.set(ModDataComponents.FOOD_SOUL.get(), soul == null ? "" : soul.serialize());
+    }
+
+    public static boolean hasFoodSoul(ItemStack stack) {
+        return getFoodSoul(stack) != null;
+    }
+
+    /**
+     * Store a grazed soul directly into the reserve/food slot instead of the 5
+     * active slots. Used when the active slots are full, so excess souls can be
+     * kept to satisfy the hunger downside later. Does NOT grant any abilities.
+     */
+    public static boolean feedSoul(ServerPlayer player, ItemStack glove, LivingEntity target) {
+        if (!BeyonderData.isBeyonder(target)) {
+            player.sendSystemMessage(Component.literal("This target has no soul worth feeding on.")
+                    .withStyle(ChatFormatting.RED));
+            return false;
+        }
+        if (hasFoodSoul(glove)) {
+            player.sendSystemMessage(Component.literal("Creeping Hunger's reserve is already full.")
+                    .withStyle(ChatFormatting.RED));
+            return false;
+        }
+
+        String pathway = BeyonderData.getPathway(target);
+        int sequence = BeyonderData.getSequence(target);
+        SoulSlot food = new SoulSlot(pathway, sequence, target.getName().getString(),
+                target.getUUID().toString(), new ArrayList<>());
+        setFoodSoul(glove, food);
+
+        player.sendSystemMessage(Component.literal(
+                "Fed the soul of " + target.getName().getString() + " into the reserve. It will be devoured before you are."
+        ).withStyle(ChatFormatting.DARK_PURPLE));
+        return true;
+    }
+
+    /**
+     * Move one of the 5 active souls into the reserve/food slot. Its abilities are
+     * stripped from the shared pool (just like releasing it), but instead of being
+     * spat back out it's kept as food for the hunger downside.
+     */
+    public static void moveToReserve(ServerPlayer player, ItemStack glove, int slotIndex) {
+        List<SoulSlot> souls = getSouls(glove);
+        if (slotIndex < 0 || slotIndex >= souls.size()) return;
+        if (hasFoodSoul(glove)) {
+            player.sendSystemMessage(Component.literal("The reserve is already full.")
+                    .withStyle(ChatFormatting.RED));
+            return;
+        }
+
+        SoulSlot moved = souls.remove(slotIndex);
+        setSouls(glove, souls);
+
+        // Strip this soul's abilities out of the shared pool (same as releaseSoul,
+        // minus spitting out the characteristic - it becomes food instead).
+        SealedArtifactData existing = glove.get(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_DATA.get());
+        if (existing != null) {
+            List<Ability> remaining = existing.abilities().stream()
+                    .filter(a -> !moved.abilityIds().contains(a.getId()))
+                    .toList();
+            if (remaining.isEmpty()) {
+                glove.remove(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_DATA.get());
+                glove.remove(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_SELECTED.get());
+            } else {
+                SoulSlot fallback = souls.isEmpty() ? moved : souls.get(souls.size() - 1);
+                SealedArtifactData newData = new SealedArtifactData(
+                        fallback.pathway(), fallback.sequence(), remaining, tokenNegatives());
+                glove.set(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_DATA.get(), newData);
+                int selected = glove.getOrDefault(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_SELECTED.get(), 0);
+                if (selected >= remaining.size()) {
+                    glove.set(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_SELECTED.get(), 0);
+                }
+            }
+        }
+
+        // The stored food soul grants nothing, so drop its ability ids.
+        setFoodSoul(glove, new SoulSlot(moved.pathway(), moved.sequence(),
+                moved.ownerName(), moved.ownerUUID(), new ArrayList<>()));
+
+        player.sendSystemMessage(Component.literal(
+                "Moved the soul of " + moved.ownerName() + " into the reserve. It will be devoured before you are."
+        ).withStyle(ChatFormatting.DARK_PURPLE));
+    }
+
     /** Finds which held soul (if any) originally granted a given ability id. */
     private static SoulSlot findSoulForAbility(List<SoulSlot> souls, String abilityId) {
         for (SoulSlot soul : souls) {
@@ -129,8 +247,15 @@ public class CreepingHungerItem extends Item {
 
         List<SoulSlot> souls = getSouls(glove);
         if (souls.size() >= MAX_SLOTS) {
-            player.sendSystemMessage(Component.literal("Creeping Hunger already holds " + MAX_SLOTS + " souls. Release one first.")
-                    .withStyle(ChatFormatting.RED));
+            // Active slots are full. Try to stash this soul in the reserve/food slot
+            // instead so it can feed the hunger later, rather than losing it.
+            if (!hasFoodSoul(glove)) {
+                feedSoul(player, glove, target);
+            } else {
+                player.sendSystemMessage(Component.literal("Creeping Hunger holds " + MAX_SLOTS
+                        + " souls and its reserve is full. Release one first.")
+                        .withStyle(ChatFormatting.RED));
+            }
             return;
         }
 
@@ -164,7 +289,9 @@ public class CreepingHungerItem extends Item {
                 targetPathway,
                 targetSequence,
                 combinedAbilities,
-                Collections.emptyList() // no built-in negative effects - we use our own hunger mechanic instead
+                tokenNegatives() // inert token effect - only present so the base mod's
+                                 // container-open cleanup doesn't treat this as a no-downside
+                                 // cheat artifact and delete it. Our real downside is hunger.
         );
         glove.set(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_DATA.get(), newData);
 
@@ -206,7 +333,7 @@ public class CreepingHungerItem extends Item {
                 // Re-flavor the shared pathway/sequence display using whichever soul is now "freshest".
                 SoulSlot fallback = souls.isEmpty() ? released : souls.get(souls.size() - 1);
                 SealedArtifactData newData = new SealedArtifactData(
-                        fallback.pathway(), fallback.sequence(), remaining, Collections.emptyList());
+                        fallback.pathway(), fallback.sequence(), remaining, tokenNegatives());
                 glove.set(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_DATA.get(), newData);
 
                 int selected = glove.getOrDefault(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_SELECTED.get(), 0);
@@ -308,14 +435,22 @@ public class CreepingHungerItem extends Item {
 
         if (ticksSinceFed < FEED_INTERVAL_TICKS) return;
 
-        List<SoulSlot> souls = getSouls(stack);
-        if (!souls.isEmpty()) {
-            // It'll happily release its own oldest stored soul before touching the wielder.
-            releaseSoul(player, stack, 0);
+        // The hunger now feeds ONLY on the separate reserve/food soul. The 5 active
+        // souls (and the abilities they grant) are never auto-consumed anymore.
+        SoulSlot food = getFoodSoul(stack);
+        if (food != null) {
+            // Devour the reserve soul. It granted no abilities, so nothing to strip
+            // from the pool - just clear it and reset the timer.
+            setFoodSoul(stack, null);
+            stack.set(ModDataComponents.LAST_FED_TICK.get(), level.getGameTime());
+            player.sendSystemMessage(Component.literal(
+                    "Creeping Hunger devours its reserve soul (" + food.ownerName() + ")."
+            ).withStyle(ChatFormatting.DARK_PURPLE));
         } else {
+            // No reserve soul stored: the mystical item, unfed, feeds on the wielder.
             player.hurt(player.damageSources().magic(), 4.0f);
             player.sendSystemMessage(Component.literal(
-                    "Creeping Hunger, starved of souls, gnaws at your own flesh instead."
+                    "Creeping Hunger, its reserve empty, gnaws at your own flesh instead. Feed it a soul."
             ).withStyle(ChatFormatting.DARK_RED));
             stack.set(ModDataComponents.LAST_FED_TICK.get(), level.getGameTime());
         }
@@ -324,6 +459,12 @@ public class CreepingHungerItem extends Item {
     @Override
     public Component getName(ItemStack stack) {
         return Component.translatable(this.getDescriptionId(stack));
+    }
+
+    /** Always show the enchantment-glint shimmer so the glove reads as a mystical weapon. */
+    @Override
+    public boolean isFoil(ItemStack stack) {
+        return true;
     }
 
     @Override
@@ -337,6 +478,15 @@ public class CreepingHungerItem extends Item {
                     .withStyle(ChatFormatting.GRAY));
         }
 
+        SoulSlot food = getFoodSoul(stack);
+        if (food != null) {
+            tooltip.add(Component.literal("Reserve (food): " + food.ownerName() + " - "
+                    + food.pathway() + " Seq " + food.sequence()).withStyle(ChatFormatting.DARK_GREEN));
+        } else {
+            tooltip.add(Component.literal("Reserve (food): empty - feed a soul or it will gnaw on you")
+                    .withStyle(ChatFormatting.DARK_RED));
+        }
+
         SealedArtifactData data = stack.get(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_DATA.get());
         if (data != null && !data.abilities().isEmpty()) {
             int selected = stack.getOrDefault(de.jakob.lotm.data.ModDataComponents.SEALED_ARTIFACT_SELECTED.get(), 0);
@@ -348,7 +498,9 @@ public class CreepingHungerItem extends Item {
 
         tooltip.add(Component.literal("Kill a Beyonder while holding this (either hand) to graze | Open Artifact Wheel to select/cast")
                 .withStyle(ChatFormatting.DARK_GRAY));
-        tooltip.add(Component.literal("/creepinghunger list | /creepinghunger release <slot>")
+        tooltip.add(Component.literal("Killing with 5 souls full stashes the extra in the reserve (food)")
+                .withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.literal("/creepinghunger list | release <slot> | reserve <slot>")
                 .withStyle(ChatFormatting.DARK_GRAY));
     }
 }

@@ -34,6 +34,15 @@ public class ModDataComponents {
                     .networkSynchronized(ByteBufCodecs.STRING_UTF8)
                     .build());
 
+    // The single "reserve"/food soul (a serialized SoulSlot, or "" when empty).
+    // This is the 6th soul: it can NOT grant abilities and can NOT be cast with.
+    // It exists purely so the hunger downside eats it instead of the wielder.
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> FOOD_SOUL =
+            DATA_COMPONENT_TYPES.register("food_soul", () -> DataComponentType.<String>builder()
+                    .persistent(Codec.STRING)
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8)
+                    .build());
+
     // Game-time tick this item was last fed - used for the hunger downside.
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> LAST_FED_TICK =
             DATA_COMPONENT_TYPES.register("last_fed_tick", () -> DataComponentType.<Long>builder()

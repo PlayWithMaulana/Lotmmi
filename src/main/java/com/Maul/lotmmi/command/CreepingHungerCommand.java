@@ -54,6 +54,36 @@ public class CreepingHungerCommand {
                                 })
                         )
                 )
+                .then(Commands.literal("reserve")
+                        .then(Commands.argument("slot", IntegerArgumentType.integer(0))
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    int slot = IntegerArgumentType.getInteger(context, "slot");
+
+                                    if (!(source.getEntity() instanceof ServerPlayer player)) {
+                                        source.sendFailure(Component.literal("This command can only be used by a player."));
+                                        return 0;
+                                    }
+
+                                    ItemStack held = findGlove(player);
+                                    if (held.isEmpty()) {
+                                        source.sendFailure(Component.literal("You must be holding Creeping Hunger in your main or off hand."));
+                                        return 0;
+                                    }
+
+                                    List<CreepingHungerItem.SoulSlot> souls = CreepingHungerItem.getSouls(held);
+                                    if (slot < 0 || slot >= souls.size()) {
+                                        source.sendFailure(Component.literal(
+                                                "Invalid slot. Creeping Hunger currently holds " + souls.size() + " active soul(s)."
+                                        ));
+                                        return 0;
+                                    }
+
+                                    CreepingHungerItem.moveToReserve(player, held, slot);
+                                    return 1;
+                                })
+                        )
+                )
                 .then(Commands.literal("list")
                         .executes(context -> {
                             CommandSourceStack source = context.getSource();
@@ -70,7 +100,9 @@ public class CreepingHungerCommand {
                             }
 
                             List<CreepingHungerItem.SoulSlot> souls = CreepingHungerItem.getSouls(held);
-                            if (souls.isEmpty()) {
+                            CreepingHungerItem.SoulSlot food = CreepingHungerItem.getFoodSoul(held);
+
+                            if (souls.isEmpty() && food == null) {
                                 player.sendSystemMessage(Component.literal("Creeping Hunger holds no souls.")
                                         .withStyle(ChatFormatting.GRAY));
                                 return 1;
@@ -84,6 +116,16 @@ public class CreepingHungerCommand {
                                         "[" + i + "] " + s.ownerName() + " - " + s.pathway() + " Seq " + s.sequence()
                                                 + " (" + s.abilityIds().size() + " abilities)"
                                 ).withStyle(ChatFormatting.LIGHT_PURPLE));
+                            }
+                            if (food != null) {
+                                player.sendSystemMessage(Component.literal(
+                                        "Reserve (food): " + food.ownerName() + " - " + food.pathway()
+                                                + " Seq " + food.sequence()
+                                ).withStyle(ChatFormatting.DARK_GREEN));
+                            } else {
+                                player.sendSystemMessage(Component.literal(
+                                        "Reserve (food): empty - it will gnaw on you when starved"
+                                ).withStyle(ChatFormatting.DARK_RED));
                             }
                             return 1;
                         })
