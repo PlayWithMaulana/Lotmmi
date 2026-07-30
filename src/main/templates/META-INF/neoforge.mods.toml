@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+issueTrackerURL="https://example.com"
+
+[[mods]]
+modId="lotmmi"
+version="1.0.0"
+displayName="LOTM Mystical Items"
+authors="You"
+description="Hand-built, canon-inspired Sealed Artifacts for LotMCraft, starting with Creeping Hunger."
+
+[[dependencies.lotmmi]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.lotmmi]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.1,1.22)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.lotmmi]]
+    modId="lotmcraft"
+    type="required"
+    versionRange="[1.0.0,)"
+    ordering="AFTER"
+    side="BOTH"
