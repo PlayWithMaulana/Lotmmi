@@ -16,7 +16,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -116,21 +115,10 @@ public class CreepingHungerItem extends Item {
     }
 
     // ---------------------------------------------------------------
-    // Grazing (stealing a soul) - sneak + right-click on a living Beyonder,
-    // or automatically on kill (see ModEvents.onLivingDeath)
+    // Grazing (stealing a soul) - happens automatically when the wielder lands
+    // the killing blow on a Beyonder while holding this in either hand
+    // (see ModEvents.onLivingDeath). There is no manual sneak+right-click graze.
     // ---------------------------------------------------------------
-
-    @Override
-    public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity target, InteractionHand hand) {
-        if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
-        if (!player.isShiftKeyDown()) return InteractionResult.PASS;
-        if (player.level().isClientSide) return InteractionResult.SUCCESS;
-
-        if (player instanceof ServerPlayer serverPlayer) {
-            grazeSoul(serverPlayer, target, stack);
-        }
-        return InteractionResult.SUCCESS;
-    }
 
     public static void grazeSoul(ServerPlayer player, LivingEntity target, ItemStack glove) {
         if (!BeyonderData.isBeyonder(target)) {
@@ -358,7 +346,7 @@ public class CreepingHungerItem extends Item {
             }
         }
 
-        tooltip.add(Component.literal("Sneak+click a Beyonder to graze | Open Artifact Wheel to select/cast")
+        tooltip.add(Component.literal("Kill a Beyonder while holding this (either hand) to graze | Open Artifact Wheel to select/cast")
                 .withStyle(ChatFormatting.DARK_GRAY));
         tooltip.add(Component.literal("/creepinghunger list | /creepinghunger release <slot>")
                 .withStyle(ChatFormatting.DARK_GRAY));
