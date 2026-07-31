@@ -1,7 +1,7 @@
-package com.yourname.lotmmi;
+package com.Maul.lotmmi;
 
-import com.yourname.lotmmi.data.ModDataComponents;
-import com.yourname.lotmmi.item.ModItems;
+import com.Maul.lotmmi.data.ModDataComponents;
+import com.Maul.lotmmi.item.ModItems;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 

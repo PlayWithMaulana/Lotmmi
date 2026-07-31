@@ -1,8 +1,8 @@
-package com.yourname.lotmmi.command;
+package com.Maul.lotmmi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.yourname.lotmmi.item.custom.CreepingHungerItem;
+import com.Maul.lotmmi.item.custom.CreepingHungerItem;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;

@@ -1,8 +1,8 @@
-package com.yourname.lotmmi.events;
+package com.Maul.lotmmi.events;
 
-import com.yourname.lotmmi.LotmMysticalItems;
-import com.yourname.lotmmi.command.CreepingHungerCommand;
-import com.yourname.lotmmi.item.custom.CreepingHungerItem;
+import com.Maul.lotmmi.LotmMysticalItems;
+import com.Maul.lotmmi.command.CreepingHungerCommand;
+import com.Maul.lotmmi.item.custom.CreepingHungerItem;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
@@ -20,12 +20,6 @@ public class ModEvents {
         CreepingHungerCommand.register(event.getDispatcher());
     }
 
-    /**
-     * Automatically grazes a dying Beyonder's soul if the killer is holding
-     * Creeping Hunger in either hand - matches canon's "grazing happens as
-     * they die" flavor, and removes the need to also sneak+right-click a
-     * target that's about to die anyway.
-     */
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {
         LivingEntity target = event.getEntity();
