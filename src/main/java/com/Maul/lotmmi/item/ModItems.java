@@ -3,6 +3,7 @@ package com.Maul.lotmmi.item;
 import com.Maul.lotmmi.LotmMysticalItems;
 import com.Maul.lotmmi.item.custom.AllBlackEyeItem;
 import com.Maul.lotmmi.item.custom.CreepingHungerItem;
+import com.Maul.lotmmi.item.custom.TinderItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -21,6 +22,9 @@ public class ModItems {
 
     public static final DeferredItem<AllBlackEyeItem> ALL_BLACK_EYE =
             ITEMS.register("all_black_eye", () -> new AllBlackEyeItem(new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<TinderItem> TINDER =
+            ITEMS.register("tinder", () -> new TinderItem(new Item.Properties().stacksTo(1)));
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

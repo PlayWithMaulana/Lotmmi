@@ -124,7 +124,7 @@ public class CreepingHungerCommand {
                                 ).withStyle(ChatFormatting.DARK_GREEN));
                             } else {
                                 player.sendSystemMessage(Component.literal(
-                                        "Reserve (food): empty - it will gnaw on you when starved"
+                                        "Reserve (food): empty"
                                 ).withStyle(ChatFormatting.DARK_RED));
                             }
                             return 1;
